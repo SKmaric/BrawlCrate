@@ -152,7 +152,7 @@ namespace BrawlLib.SSBB.ResourceNodes
         {
             get
             {
-                if (((REFFNode) Parent.Parent.Parent).VersionMinor == 9)
+                if (((REFFNode) Parent.Parent.Parent).VersionMinor == 9 || ((REFFNode)Parent.Parent.Parent).VersionMinor == 11)
                 {
                     switch (CurveFlag)
                     {
@@ -201,7 +201,7 @@ namespace BrawlLib.SSBB.ResourceNodes
             set
             {
                 int i = 0;
-                if (((REFFNode) Parent.Parent.Parent).VersionMinor == 9)
+                if (((REFFNode) Parent.Parent.Parent).VersionMinor == 9 || ((REFFNode)Parent.Parent.Parent).VersionMinor == 11)
                 {
                     switch (CurveFlag)
                     {
@@ -426,7 +426,7 @@ namespace BrawlLib.SSBB.ResourceNodes
             offset += RandomTableSize;
             if (NameTableSize > 4)
             {
-                if (offset + NameTableSize <= size)
+                //if (offset + NameTableSize <= size)
                 {
                     AnimCurveTableHeader* hdr = (AnimCurveTableHeader*) offset;
 
@@ -436,14 +436,9 @@ namespace BrawlLib.SSBB.ResourceNodes
                     {
                         _names.Add(new string((sbyte*) addr + 2));
                     }
-
-                    offset += NameTableSize;
                 }
             }
-            else
-            {
-                offset += NameTableSize;
-            }
+            offset += NameTableSize;
 
             if (InfoTableSize > 4)
             {

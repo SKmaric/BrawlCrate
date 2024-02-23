@@ -1282,6 +1282,17 @@ Y: Only the Y axis is allowed to rotate. Is affected by the parent bone's rotati
                         }
                     }
 
+                    // Colors Cutscene workaround
+                    if (e.Flags.IsRotationIsotropic && !e.Flags.HasRotation)
+                    {
+                        _frameState._rotate = new Vector3(0, 0, 0);
+                    }
+
+                    if (e.Flags.IsScaleIsotropic && !e.Flags.HasScale)
+                    {
+                        _frameState._scale = new Vector3(1, 1, 1);
+                    }
+
                     _frameState.CalcTransforms();
                 }
             }

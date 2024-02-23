@@ -12,7 +12,7 @@ namespace BrawlLib.Wii.Animations
         private static readonly string[] types = {"scale", "rotate", "translate"};
         private static readonly string[] axes = {"X", "Y", "Z"};
 
-        public static void Serialize(CHR0Node node, string output)
+        public static void Serialize(CHR0Node node, string output, float mFactor = 1.0f)
         {
             MDL0Node model;
 
@@ -28,10 +28,10 @@ namespace BrawlLib.Wii.Animations
                 return;
             }
 
-            Serialize(node, output, model);
+            Serialize(node, output, model, mFactor);
         }
 
-        public static void Serialize(CHR0Node node, string output, MDL0Node model)
+        public static void Serialize(CHR0Node node, string output, MDL0Node model, float mFactor = 1.0f)
         {
             model.Populate();
             using (StreamWriter file = new StreamWriter(output))
@@ -52,6 +52,20 @@ namespace BrawlLib.Wii.Animations
                         continue;
                     }
 
+                    // Colors rotation workaround
+                    if (e.Flags.IsRotationIsotropic && !e.Flags.HasRotation)
+                    {
+                        e.KeyArrays[3].SetFrameValue(0, 0);
+                        e.KeyArrays[4].SetFrameValue(0, 0);
+                        e.KeyArrays[5].SetFrameValue(0, 0);
+                    }
+                    if (e.Flags.IsScaleIsotropic && !e.Flags.HasScale)
+                    {
+                        e.KeyArrays[0].SetFrameValue(0, 1);
+                        e.KeyArrays[1].SetFrameValue(0, 1);
+                        e.KeyArrays[2].SetFrameValue(0, 1);
+                    }
+
                     KeyframeCollection c = e.Keyframes;
                     int counter = 0;
                     for (int index = 0; index < 9; index++)
@@ -63,30 +77,169 @@ namespace BrawlLib.Wii.Animations
                             continue;
                         }
 
-                        file.WriteLine("anim {0}.{0}{1} {0}{1} {2} {3} {4} {5};", types[index / 3], axes[index % 3],
+                        var tempaxis = axes[index % 3];
+                        //if (types[index / 3] == "translate")
+                        //{
+                        //    if (tempaxis == "Y")
+                        //        tempaxis = "Z";
+                        //    else if (tempaxis == "Z")
+                        //        tempaxis = "Y";
+                        //}
+                        //if (types[index / 3] == "rotate")
+                        //{
+                            //if (tempaxis == "Y")
+                            //    tempaxis = "Z";
+                            //else if (tempaxis == "Z")
+                            //    tempaxis = "Y";
+                        //}
+
+                        file.WriteLine("anim {0}.{0}{1} {0}{1} {2} {3} {4} {5};", types[index / 3], tempaxis,
                             e.Name, 0, b.Children.Count, counter);
                         file.WriteLine("animData {");
                         file.WriteLine("  input time;");
                         file.WriteLine($"  output {(index > 2 && index < 6 ? "angular" : "linear")};");
-                        file.WriteLine("  weighted 1;");
+                        file.WriteLine("  weighted 0;");
                         file.WriteLine("  preInfinity constant;");
                         file.WriteLine("  postInfinity constant;");
                         file.WriteLine("  keys {");
+                        bool isOutFrame = false;
                         for (KeyframeEntry entry = array._keyRoot._next; entry != array._keyRoot; entry = entry._next)
                         {
-                            float angle = (float) Math.Atan(entry._tangent) * Maths._rad2degf;
-                            file.WriteLine("    {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10};",
-                                entry._index,
-                                entry._value.ToString(CultureInfo.InvariantCulture.NumberFormat),
-                                "fixed",
-                                "fixed",
-                                "1",
-                                "1",
-                                "0",
-                                angle.ToString(CultureInfo.InvariantCulture.NumberFormat),
-                                "1",
-                                angle.ToString(CultureInfo.InvariantCulture.NumberFormat),
-                                "1");
+                            // skip if already used as Out tangent/value for previous entry
+                            if (isOutFrame)
+                            {
+                                isOutFrame = false;
+                                continue;
+                            }
+
+                            var value = entry._value;
+                            var valueOut = value;
+                            float angle = (float)Math.Atan(entry._tangent) * Maths._rad2degf;
+                            float angleOut = angle;
+
+                            // Two tangents same value
+                            if (entry._index == entry._next._index && entry._value == entry._next._value)
+                            {
+                                // Unique in and out tangents, same value
+                                angleOut = (float)Math.Atan(entry._next._tangent) * Maths._rad2degf;
+                                isOutFrame = true;
+                            }
+
+
+                            // colors scale fix
+                            
+                            if (types[index / 3] == "translate")
+                            {
+                                if (mFactor != 1.0f)
+                                {
+                                    value = value * mFactor;
+                                    valueOut = valueOut * mFactor;
+                                    angle = angle * mFactor;
+                                    angleOut = angleOut * mFactor;
+                                }
+                                //if (tempaxis == "Z")
+                                //{
+                                //    value = -value;
+                                //    angle = -angle;
+                                //    valueOut = -valueOut;
+                                //    angleOut = -angleOut;
+                                //}
+                            }
+                            //else if (types[index / 3] == "rotate")
+                            //{
+                            //    if (tempaxis == "X")
+                            //    {
+                            //        value = value + 90;
+                            //        valueOut = valueOut + 90;
+                            //    }
+                            ////    if (tempaxis == "Z")
+                            ////    {
+                            ////        value = -value;
+                            ////        angle = -angle;
+                            ////        valueOut = -valueOut;
+                            ////        angleOut = -angleOut;
+                            ////    }
+                            ////    if (tempaxis == "Y")
+                            ////    {
+                            ////        value = value + 90;
+                            ////        valueOut = valueOut + 90;
+                            ////    }
+                            ////    //if (tempaxis == "Z")
+                            ////    //{
+                            ////    //    value = -value;
+                            ////    //    angle = -angle;
+                            ////    //}
+                            //}
+
+                            if (entry._index == entry._next._index && entry._value != entry._next._value)
+                            {
+                                // Unique in and out values
+                                valueOut = entry._next._value;
+                                angleOut = (float)Math.Atan(entry._next._tangent) * Maths._rad2degf;
+                                isOutFrame = true;
+
+                                // colors scale fix
+                                if (types[index / 3] == "translate")
+                                {
+                                    if (mFactor != 1.0f)
+                                    {
+                                        valueOut = valueOut * mFactor;
+                                        angleOut = angleOut * mFactor;
+                                    }
+                                    //if (tempaxis == "Y")
+                                    //{
+                                    //    valueOut = -valueOut;
+                                    //    angleOut = -angleOut;
+                                    //}
+                                }
+                                //else if (types[index / 3] == "rotate")
+                                //{
+                                //    if (tempaxis == "X")
+                                //    {
+                                //        valueOut = valueOut + 90;
+                                //    }
+                                ////    if (tempaxis == "Y")
+                                ////    {
+                                ////        valueOut = -valueOut;
+                                ////        angleOut = -angleOut;
+                                ////    }
+                                //}
+
+                                file.WriteLine("    {0} {1} {2} {3} {4} {5} {6} {7} {8};",
+                                    entry._index,
+                                    value.ToString(CultureInfo.InvariantCulture.NumberFormat),
+                                    "fixed",
+                                    "linear",
+                                    "1",
+                                    "1",
+                                    "0",
+                                    angle.ToString(CultureInfo.InvariantCulture.NumberFormat),
+                                    "1");
+                                file.WriteLine("    {0} {1} {2} {3} {4} {5} {6} {7} {8};",
+                                    entry._index + ".001",
+                                    valueOut.ToString(CultureInfo.InvariantCulture.NumberFormat),
+                                    "linear",
+                                    "fixed",
+                                    "1",
+                                    "1",
+                                    "0",
+                                    angleOut.ToString(CultureInfo.InvariantCulture.NumberFormat),
+                                    "1");
+                            } else {
+                                // standard tangents
+                                file.WriteLine("    {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10};",
+                                    entry._index,
+                                    value.ToString(CultureInfo.InvariantCulture.NumberFormat),
+                                    "fixed",
+                                    "fixed",
+                                    "1",
+                                    "1",
+                                    "0",
+                                    angle.ToString(CultureInfo.InvariantCulture.NumberFormat),
+                                    "1",
+                                    angleOut.ToString(CultureInfo.InvariantCulture.NumberFormat),
+                                    "1");
+                            }
                         }
 
                         file.WriteLine("  }");

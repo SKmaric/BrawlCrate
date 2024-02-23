@@ -534,15 +534,17 @@ namespace BrawlLib.SSBB.Types
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public unsafe struct SCN0KeyframesHeader
     {
-        public const int Size = 4;
+        public const int Size = 8;
 
         public bushort _numFrames;
         public bushort _unk;
+        public bfloat _unk2;
 
         public SCN0KeyframesHeader(int entries)
         {
             _numFrames = (ushort) entries;
             _unk = 0;
+            _unk2 = 0f;
         }
 
         private VoidPtr Address
@@ -563,7 +565,8 @@ namespace BrawlLib.SSBB.Types
     {
         public const int Size = 12;
 
-        public bfloat _tangent, _index, _value;
+        //public bfloat _tangent, _index, _value;
+        public bfloat _index, _value, _tangent;
 
         public static implicit operator SCN0Keyframe(SCN0KeyframeStruct v)
         {

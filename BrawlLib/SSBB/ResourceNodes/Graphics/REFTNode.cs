@@ -176,6 +176,8 @@ namespace BrawlLib.SSBB.ResourceNodes
 
         [Browsable(false)] public int ImageCount => LevelOfDetail;
 
+        private bushort version = 11;
+
         public Bitmap GetImage(int index)
         {
             try
@@ -185,6 +187,9 @@ namespace BrawlLib.SSBB.ResourceNodes
                     return TextureConverter.DecodeIndexed((byte*) Header + 0x20, Width, Height, Palette, index + 1,
                         _format);
                 }
+
+                if (version == 11)
+                    return TextureConverter.Decode((byte*)Header + 0x40, Width, Height, index + 1, _format);
 
                 return TextureConverter.Decode((byte*) Header + 0x20, Width, Height, index + 1, _format);
             }
