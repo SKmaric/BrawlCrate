@@ -1795,17 +1795,18 @@ namespace BrawlLib.Modeling.Collada
             writer.WriteEndElement();
         }
 
-        private static void WriteNodes(MDL0Node model, XmlWriter writer, bool scaleMode, bool singleBindMode, bool multimatCombine)
+        private static void WriteNodes(MDL0Node model, XmlWriter writer, bool useMatrix = false, bool skipNeutral = true, bool writeBones = true, bool writePolys = true,
+            bool scaleMode = false, bool singleBindMode = false, bool multimatCombine = false)
         {
-            if (model._boneList != null)
+            if (model._boneList != null && writeBones)
             {
                 foreach (MDL0BoneNode bone in model._boneList)
                 {
-                    WriteBone(bone, writer, scaleMode, singleBindMode, multimatCombine);
+                    WriteBone(bone, writer, useMatrix, skipNeutral, scaleMode, singleBindMode, multimatCombine);
                 }
             }
 
-            if (model._objList != null)
+            if (model._objList != null && writePolys)
             {
                 foreach (MDL0ObjectNode poly in model._objList)
                 {
@@ -1828,7 +1829,8 @@ namespace BrawlLib.Modeling.Collada
             }
         }
 
-        private static void WriteBone(MDL0BoneNode bone, XmlWriter writer, bool scaleMode, bool singleBindMode, bool multimatCombine, bool useMatrix = true)
+        private static void WriteBone(MDL0BoneNode bone, XmlWriter writer, bool useMatrix = false, bool skipNeutral = true,
+            bool scaleMode = false, bool singleBindMode = false, bool multimatCombine = false)
         {
             bool flip = false;
             if (singleBindMode && bone.SingleBindObjects.Length > 0) 
@@ -1875,7 +1877,7 @@ namespace BrawlLib.Modeling.Collada
             }
             else
             {
-                if (bone._bindState._translate != new Vector3())
+                if (bone._bindState._translate != new Vector3() || !skipNeutral)
                 {
                     Vector3 translate = new Vector3();
                     if (scaleMode == true)
@@ -1884,6 +1886,7 @@ namespace BrawlLib.Modeling.Collada
                         translate = bone._bindState._translate;
 
                     writer.WriteStartElement("translate");
+                    writer.WriteAttributeString("sid", "translate");
                     writer.WriteString(
                         translate._x.ToString(CultureInfo.InvariantCulture.NumberFormat) + " " +
                         translate._y.ToString(CultureInfo.InvariantCulture.NumberFormat) + " " +
@@ -1891,33 +1894,37 @@ namespace BrawlLib.Modeling.Collada
                     writer.WriteEndElement(); //translate
                 }
 
-                if (bone._bindState._rotate._z != 0)
+                if (bone._bindState._rotate._z != 0  || !skipNeutral)
                 {
                     writer.WriteStartElement("rotate");
+                    writer.WriteAttributeString("sid", "rotateZ");
                     writer.WriteString("0 0 1 " +
                                        bone._bindState._rotate._z.ToString(CultureInfo.InvariantCulture.NumberFormat));
                     writer.WriteEndElement(); //rotate
                 }
 
-                if (bone._bindState._rotate._y != 0)
+                if (bone._bindState._rotate._y != 0  || !skipNeutral)
                 {
                     writer.WriteStartElement("rotate");
+                    writer.WriteAttributeString("sid", "rotateY");
                     writer.WriteString("0 1 0 " +
                                        bone._bindState._rotate._y.ToString(CultureInfo.InvariantCulture.NumberFormat));
                     writer.WriteEndElement(); //rotate
                 }
 
-                if (bone._bindState._rotate._x != 0)
+                if (bone._bindState._rotate._x != 0 || !skipNeutral)
                 {
                     writer.WriteStartElement("rotate");
+                    writer.WriteAttributeString("sid", "rotateX");
                     writer.WriteString("1 0 0 " +
                                        bone._bindState._rotate._x.ToString(CultureInfo.InvariantCulture.NumberFormat));
                     writer.WriteEndElement(); //rotate
                 }
 
-                if (bone._bindState._scale != new Vector3(1))
+                if (bone._bindState._scale != new Vector3(1) || !skipNeutral)
                 {
                     writer.WriteStartElement("scale");
+                    writer.WriteAttributeString("sid", "scale");
                     writer.WriteString(
                         bone._bindState._scale._x.ToString(CultureInfo.InvariantCulture.NumberFormat) + " " +
                         bone._bindState._scale._y.ToString(CultureInfo.InvariantCulture.NumberFormat) + " " +
@@ -2067,11 +2074,31 @@ namespace BrawlLib.Modeling.Collada
             return s;
         }
 
-        public static void Serialize(CHR0Node[] animations, float fps, bool bake, string outFile)
+        public static void Serialize(CHR0Node animation, float fps, bool bake, string outFile)
+        {
+            MDL0Node model;
+
+            OpenFileDialog dlgOpen = new OpenFileDialog
+            {
+                Filter = "MDL0 Model (*.mdl0)|*.mdl0",
+                Title = "Select the model this animation is for..."
+            };
+
+            if (dlgOpen.ShowDialog() != DialogResult.OK ||
+                (model = (MDL0Node)NodeFactory.FromFile(null, dlgOpen.FileName)) == null)
+            {
+                return;
+            }
+
+            Serialize(animation, fps, bake, outFile, model);
+        }
+
+        public static void Serialize(CHR0Node animation, float fps, bool bake, string outFile, MDL0Node model)
         {
             string[] types = new[] { "scale", "rotate", "translate" };
             string[] axes = new[] { "X", "Y", "Z" };
             bool first = true;
+            model.Populate();
 
             using (FileStream stream = new FileStream(outFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None,
                 0x1000, FileOptions.SequentialScan))
@@ -2083,17 +2110,34 @@ namespace BrawlLib.Modeling.Collada
 
                     writer.WriteStartDocument();
                     writer.WriteStartElement("COLLADA", "http://www.collada.org/2008/03/COLLADASchema");
-                    writer.WriteAttributeString("version", "1.4.1");
+                    writer.WriteAttributeString("version", "1.5.0");
 
                     writer.WriteStartElement("asset");
-                    writer.WriteStartElement("contributor");
-                    writer.WriteElementString("authoring_tool", Application.ProductName);
-                    writer.WriteEndElement();
+                    {
+                        writer.WriteStartElement("contributor");
+                        writer.WriteElementString("authoring_tool", Application.ProductName);
+                        writer.WriteEndElement();
+
+                        writer.WriteStartElement("created");
+                        writer.WriteString(DateTime.UtcNow.ToString("s", CultureInfo.InvariantCulture) + "Z");
+                        writer.WriteEndElement();
+
+                        writer.WriteStartElement("modified");
+                        writer.WriteString(DateTime.UtcNow.ToString("s", CultureInfo.InvariantCulture) + "Z");
+                        writer.WriteEndElement();
+
+                        writer.WriteStartElement("unit");
+                        writer.WriteAttributeString("meter", "1");
+                        writer.WriteAttributeString("name", "meter");
+                        writer.WriteEndElement();
+
+                        writer.WriteElementString("up_axis", "Y_UP");
+                    }
                     writer.WriteEndElement();
 
                     writer.WriteStartElement("library_animations");
                     {
-                        foreach (CHR0Node animation in animations)
+                        //foreach (CHR0Node animation in animations)
                         {
                             string animName = animation.Name;
 
@@ -2121,7 +2165,7 @@ namespace BrawlLib.Modeling.Collada
 
                                         string name = $"{bone}_{type}{axis}";
 
-                                        //writer.WriteStartElement("animation");
+                                        writer.WriteStartElement("animation");
                                         //writer.WriteAttributeString("id", name);
                                         {
                                             #region Input source
@@ -2407,7 +2451,7 @@ namespace BrawlLib.Modeling.Collada
                                                 writer.WriteEndElement(); //input
 
                                                 writer.WriteStartElement("input");
-                                                writer.WriteAttributeString("semantic", "OUT_TANGEN");
+                                                writer.WriteAttributeString("semantic", "OUT_TANGENT");
                                                 writer.WriteAttributeString("source", "#" + name + "_outTan");
                                                 writer.WriteEndElement(); //input
 
@@ -2422,11 +2466,13 @@ namespace BrawlLib.Modeling.Collada
 
                                             writer.WriteStartElement("channel");
                                             writer.WriteAttributeString("source", "#" + name + "_sampler");
-                                            writer.WriteAttributeString("target",
-                                                $"{bone}/{type}.{axis}");
+                                            if (type == "rotate")
+                                                writer.WriteAttributeString("target", $"{bone}/{type}{axis}.ANGLE");
+                                            else
+                                                writer.WriteAttributeString("target", $"{bone}/{type}.{axis}");
                                             writer.WriteEndElement(); //channel
                                         }
-                                        //writer.WriteEndElement(); //animation
+                                        writer.WriteEndElement(); //animation
                                     }
                                 }
                             }
@@ -2434,6 +2480,33 @@ namespace BrawlLib.Modeling.Collada
                         }
 
                         writer.WriteEndElement(); //library_animations
+
+                        writer.WriteStartElement("library_visual_scenes");
+                        {
+                            writer.WriteStartElement("visual_scene");
+                            {
+                                //Attach nodes/bones to scene, starting with TopN
+                                //Specify transform for each node
+                                //Weighted polygons must use instance_controller
+                                //Standard geometry uses instance_geometry
+
+                                writer.WriteAttributeString("id", "RootNode");
+                                writer.WriteAttributeString("name", "RootNode");
+
+                                //Define bones and geometry instances
+                                WriteNodes(model, writer, false, false, true, false);
+                            }
+                            writer.WriteEndElement();
+                        }
+                        writer.WriteEndElement();
+
+                        writer.WriteStartElement("scene");
+                        {
+                            writer.WriteStartElement("instance_visual_scene");
+                            writer.WriteAttributeString("url", "#RootNode");
+                            writer.WriteEndElement(); //instance visual scene
+                        }
+                        writer.WriteEndElement(); //scene
                     }
                 }
             }
