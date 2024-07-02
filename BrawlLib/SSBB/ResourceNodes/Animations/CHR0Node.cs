@@ -196,7 +196,7 @@ namespace BrawlLib.SSBB.ResourceNodes
         {
             if (outPath.EndsWith(".dae", StringComparison.OrdinalIgnoreCase))
             {
-                Collada.Serialize(new CHR0Node[] {this}, 60.0f, false, outPath);
+                Collada.Serialize(this, 60.0f, false, outPath);
             }
             else if (outPath.EndsWith(".anim", StringComparison.OrdinalIgnoreCase))
             {

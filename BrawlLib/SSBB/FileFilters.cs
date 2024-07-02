@@ -45,7 +45,7 @@ namespace BrawlLib.SSBB
             SupportedFilesHandler.GetCompleteFilter("chr0", "anim", "txt", "json");
 
         public static string CHR0Export =
-            SupportedFilesHandler.GetCompleteFilter("chr0", "anim");
+            SupportedFilesHandler.GetCompleteFilter("chr0", "anim", "dae");
 
         public static string CLR0 =
             SupportedFilesHandler.GetCompleteFilter("clr0");
