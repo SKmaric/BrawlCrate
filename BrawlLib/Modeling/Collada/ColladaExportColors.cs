@@ -254,7 +254,17 @@ namespace BrawlLib.Modeling.Collada
             {
                 int pFrom = mat._name.IndexOf("__") + 2;
                 int pTo = mat._name.IndexOf("__", pFrom);
-                String shaderName = mat._name.Substring(pFrom, pTo - pFrom);
+                string shaderName;
+                try
+                {
+                    shaderName = mat._name.Substring(pFrom, pTo - pFrom);
+                }
+                catch
+                {
+                    pFrom = mat._name.LastIndexOf("_");
+                    shaderName = mat._name.Substring(pFrom);
+                }
+                
 
                 writer.WriteStartElement("effect");
                 {
